@@ -1,4 +1,7 @@
 name: CI Guard — Cost Policy Check
+permissions:
+  contents: read
+  pull-requests: write
 
 on:
   pull_request:
@@ -177,7 +180,7 @@ jobs:
       # ── Infracost PR comment (LIVE mode only) ────────────────────────────────
       - name: Post Infracost cost breakdown as PR comment
         if: steps.mode.outputs.live == 'yes' && github.event_name == 'pull_request'
-        uses: infracost/actions/comment@v3
+        uses: infracost/actions/diff@v5
         with:
           path: /tmp/infracost.json
           behavior: update   # Update existing comment on re-push; don't spam
