@@ -6,6 +6,13 @@ on:
       - 'infra-demo/**'
       - 'ci-guard/**'
       - '.github/workflows/ci-guard.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'infra-demo/**'
+      - 'ci-guard/**'
+      - '.github/workflows/ci-guard.yml'
 
 # Only allow one cost check per PR branch at a time
 concurrency:
