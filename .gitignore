@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+coverage/
+*.tsbuildinfo
+
+# Terraform — never commit state, lock, or actual tfvars
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.binary
+tfplan.json
+terraform.tfvars
+.terraform.lock.hcl
+
+# Infracost — generated JSON output files
+infracost-real.json
+infracost-output.json
+.infracost/

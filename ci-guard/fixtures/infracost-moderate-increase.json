@@ -1,0 +1,50 @@
+{
+  "_comment": "FIXTURE — represents a valid Infracost output where the baseline (past) was also non-zero. Tests absolute vs increase threshold logic.",
+  "version": "0.2",
+  "currency": "USD",
+  "projects": [
+    {
+      "name": "infra-demo",
+      "metadata": {
+        "path": "../infra-demo",
+        "type": "terraform_dir"
+      },
+      "pastBreakdown": {
+        "resources": [],
+        "totalHourlyCost": "0.0368",
+        "totalMonthlyCost": "26.86"
+      },
+      "breakdown": {
+        "resources": [],
+        "totalHourlyCost": "0.0780",
+        "totalMonthlyCost": "56.94"
+      },
+      "diff": {
+        "resources": [],
+        "totalHourlyCost": "0.0412",
+        "totalMonthlyCost": "30.08"
+      },
+      "summary": {
+        "totalDetectedResources": 3,
+        "totalSupportedResources": 2,
+        "totalUnsupportedResources": 0,
+        "totalUsageBasedResources": 0,
+        "totalNoPriceResources": 1
+      }
+    }
+  ],
+  "totalHourlyCost": "0.0780",
+  "totalMonthlyCost": "56.94",
+  "pastTotalHourlyCost": "0.0368",
+  "pastTotalMonthlyCost": "26.86",
+  "diffTotalHourlyCost": "0.0412",
+  "diffTotalMonthlyCost": "30.08",
+  "timeGenerated": "2026-10-24T00:00:00Z",
+  "summary": {
+    "totalDetectedResources": 3,
+    "totalSupportedResources": 2,
+    "totalUnsupportedResources": 0,
+    "totalUsageBasedResources": 0,
+    "totalNoPriceResources": 1
+  }
+}

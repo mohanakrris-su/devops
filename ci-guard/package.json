@@ -1,0 +1,20 @@
+{
+  "name": "costwatch-ci-guard",
+  "version": "1.0.0",
+  "description": "CostWatch CI Guard — cost policy check for Terraform changes in GitHub Actions",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:verbose": "vitest run --reporter=verbose",
+    "check": "node --loader tsx scripts/policy-check.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.7"
+  }
+}

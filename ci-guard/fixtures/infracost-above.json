@@ -1,0 +1,107 @@
+{
+  "_comment": "FIXTURE — not real Infracost output. Used for offline tests only. Represents an expensive change: large EC2 + RDS upgrade exceeding budget.",
+  "version": "0.2",
+  "currency": "USD",
+  "projects": [
+    {
+      "name": "infra-demo",
+      "metadata": {
+        "path": "../infra-demo",
+        "type": "terraform_dir"
+      },
+      "pastBreakdown": {
+        "resources": [],
+        "totalHourlyCost": "0.0368",
+        "totalMonthlyCost": "26.86"
+      },
+      "breakdown": {
+        "resources": [
+          {
+            "name": "aws_instance.app_server",
+            "resourceType": "aws_instance",
+            "tags": {},
+            "metadata": {},
+            "hourlyCost": "0.4160",
+            "monthlyCost": "303.68",
+            "costComponents": [
+              {
+                "name": "Instance usage (Linux/UNIX, on-demand, m5.2xlarge)",
+                "unit": "hours",
+                "hourlyQuantity": "1",
+                "monthlyQuantity": "730",
+                "price": "0.4160",
+                "hourlyCost": "0.4160",
+                "monthlyCost": "303.68"
+              }
+            ]
+          },
+          {
+            "name": "aws_db_instance.database",
+            "resourceType": "aws_db_instance",
+            "tags": {},
+            "metadata": {},
+            "hourlyCost": "0.384",
+            "monthlyCost": "280.32",
+            "costComponents": [
+              {
+                "name": "Database instance (on-demand, Multi-AZ, db.r6g.xlarge)",
+                "unit": "hours",
+                "hourlyQuantity": "1",
+                "monthlyQuantity": "730",
+                "price": "0.384",
+                "hourlyCost": "0.384",
+                "monthlyCost": "280.32"
+              },
+              {
+                "name": "Storage (io1, 1000 IOPS)",
+                "unit": "GB-months",
+                "hourlyQuantity": "0.13699",
+                "monthlyQuantity": "100",
+                "price": "0.125",
+                "hourlyCost": "0.01712",
+                "monthlyCost": "12.50"
+              }
+            ]
+          },
+          {
+            "name": "aws_s3_bucket.artifacts",
+            "resourceType": "aws_s3_bucket",
+            "tags": {},
+            "metadata": {},
+            "hourlyCost": "0",
+            "monthlyCost": "0",
+            "costComponents": []
+          }
+        ],
+        "totalHourlyCost": "0.8000",
+        "totalMonthlyCost": "596.50"
+      },
+      "diff": {
+        "resources": [],
+        "totalHourlyCost": "0.7632",
+        "totalMonthlyCost": "569.64"
+      },
+      "summary": {
+        "totalDetectedResources": 3,
+        "totalSupportedResources": 2,
+        "totalUnsupportedResources": 0,
+        "totalUsageBasedResources": 0,
+        "totalNoPriceResources": 1
+      }
+    }
+  ],
+  "totalHourlyCost": "0.8000",
+  "totalMonthlyCost": "596.50",
+  "pastTotalHourlyCost": "0.0368",
+  "pastTotalMonthlyCost": "26.86",
+  "diffTotalHourlyCost": "0.7632",
+  "diffTotalMonthlyCost": "569.64",
+  "timeGenerated": "2026-10-24T00:00:00Z",
+  "summary": {
+    "totalDetectedResources": 3,
+    "totalSupportedResources": 2,
+    "totalUnsupportedResources": 0,
+    "totalUsageBasedResources": 0,
+    "totalNoPriceResources": 1
+  }
+}

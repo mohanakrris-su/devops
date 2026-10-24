@@ -1,0 +1,209 @@
+name: CI Guard — Cost Policy Check
+
+on:
+  pull_request:
+    paths:
+      - 'infra-demo/**'
+      - 'ci-guard/**'
+      - '.github/workflows/ci-guard.yml'
+
+# Only allow one cost check per PR branch at a time
+concurrency:
+  group: ci-guard-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 1: Validate Terraform syntax — no cloud credentials needed
+  # ─────────────────────────────────────────────────────────────────────────────
+  terraform-validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra-demo
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.5"
+          # terraform_wrapper must be false so that stdout is parseable by
+          # Infracost in the next job. Enabling it wraps output and breaks JSON.
+          terraform_wrapper: false
+
+      - name: Terraform Format Check
+        # Hard failure — keep .tf files consistently formatted
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init (local backend, no cloud credentials)
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 2: Cost estimation + policy check
+  #
+  # Two modes controlled by the INFRACOST_API_KEY repository secret:
+  #
+  #   LIVE mode (INFRACOST_API_KEY secret is set):
+  #     • Infracost calls its pricing API to generate real estimates
+  #     • terraform plan is run (read-only, no apply)
+  #     • A cost breakdown comment is posted on the PR
+  #     • Policy check runs against real numbers → PASS or FAIL
+  #
+  #   FIXTURE mode (INFRACOST_API_KEY secret not set):
+  #     • Offline fixture JSON is used (deterministic, no external calls)
+  #     • Policy engine still runs and reports violations
+  #     • Status is WARN, not PASS — data is clearly labeled as not real
+  #
+  # To enable LIVE mode:
+  #   1. Get a free API key at https://www.infracost.io/
+  #   2. Add it as a repository secret named INFRACOST_API_KEY
+  #   3. Add AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY secrets
+  #      (use a read-only IAM user — never root credentials)
+  # ─────────────────────────────────────────────────────────────────────────────
+  cost-policy:
+    name: Cost Policy Check
+    runs-on: ubuntu-latest
+    needs: terraform-validate
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: ci-guard/package-lock.json
+
+      - name: Install CI Guard dependencies
+        run: npm ci
+        working-directory: ci-guard
+
+      # ── Decide mode based on whether the API key secret is present ──────────
+      # GitHub Actions does not allow `secrets.*` in `if:` expressions directly.
+      # The canonical workaround is to expose it via an env var and check that.
+      - name: Detect run mode
+        id: mode
+        env:
+          HAS_API_KEY: ${{ secrets.INFRACOST_API_KEY != '' && 'yes' || 'no' }}
+        run: echo "live=$HAS_API_KEY" >> $GITHUB_OUTPUT
+
+      # ── LIVE mode steps (require INFRACOST_API_KEY and AWS credentials) ──────
+      - name: Setup Terraform (for Infracost plan — no apply)
+        if: steps.mode.outputs.live == 'yes'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.5"
+          terraform_wrapper: false   # REQUIRED — Infracost cannot parse wrapped output
+
+      - name: Setup Infracost
+        if: steps.mode.outputs.live == 'yes'
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Configure AWS credentials (read-only, for terraform plan)
+        if: steps.mode.outputs.live == 'yes'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Generate Infracost cost breakdown (LIVE)
+        if: steps.mode.outputs.live == 'yes'
+        env:
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+          # db_password is required by the variable definition but is not used
+          # in cost estimation — it is a placeholder for the plan call only.
+          TF_VAR_db_password: "CI_PLACEHOLDER_NOT_USED_IN_ESTIMATION"
+        run: |
+          infracost breakdown \
+            --path infra-demo \
+            --format json \
+            --out-file /tmp/infracost.json
+          echo "INFRACOST_JSON_PATH=/tmp/infracost.json" >> $GITHUB_ENV
+
+      # ── FIXTURE mode (no API key — fully offline, deterministic) ─────────────
+      - name: Use fixture (FIXTURE mode — INFRACOST_API_KEY not configured)
+        if: steps.mode.outputs.live != 'yes'
+        run: |
+          echo "CI_GUARD_FIXTURE=true" >> $GITHUB_ENV
+          echo "::notice title=Fixture Mode::Running in FIXTURE mode — cost estimates are not real. Add INFRACOST_API_KEY, AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY repository secrets to enable live pricing."
+
+      # ── CI Guard tests (both modes) ──────────────────────────────────────────
+      - name: Run CI Guard test suite
+        working-directory: ci-guard
+        run: npm test
+
+      # ── Policy check against this PR's infrastructure (both modes) ───────────
+      - name: Run cost policy check
+        id: policy
+        working-directory: ci-guard
+        env:
+          BUDGET_MAX_MONTHLY: ${{ vars.BUDGET_MAX_MONTHLY || '500' }}
+          BUDGET_MAX_INCREASE: ${{ vars.BUDGET_MAX_INCREASE || '100' }}
+          CI_GUARD_WARN_ONLY: ${{ vars.CI_GUARD_WARN_ONLY || 'false' }}
+          CI_GUARD_FIXTURE: ${{ env.CI_GUARD_FIXTURE }}
+          INFRACOST_JSON_PATH: ${{ env.INFRACOST_JSON_PATH }}
+        run: node --import tsx/esm scripts/policy-check.ts
+        continue-on-error: true  # Exit code handled explicitly below
+
+      - name: Enforce policy result
+        run: |
+          if [ "${{ steps.policy.outcome }}" = "failure" ]; then
+            echo "::error title=Cost Policy FAILED::The proposed infrastructure change exceeds configured cost limits."
+            echo "::error::Review the policy check output above. Reduce instance sizes, change to reserved pricing, or raise the budget threshold (BUDGET_MAX_MONTHLY / BUDGET_MAX_INCREASE repository variables)."
+            exit 1
+          else
+            echo "::notice title=Cost Policy OK::Policy check passed (or running in WARN/fixture mode)."
+          fi
+
+      # ── Infracost PR comment (LIVE mode only) ────────────────────────────────
+      - name: Post Infracost cost breakdown as PR comment
+        if: steps.mode.outputs.live == 'yes' && github.event_name == 'pull_request'
+        uses: infracost/actions/comment@v3
+        with:
+          path: /tmp/infracost.json
+          behavior: update   # Update existing comment on re-push; don't spam
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 3: Existing app regression guard — always runs, parallel with cost-policy
+  # ─────────────────────────────────────────────────────────────────────────────
+  existing-app-guard:
+    name: Existing App Build Guard
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Backend — install, type check, and test
+        run: |
+          npm ci
+          npx tsc --noEmit
+          npm test
+        working-directory: backend
+
+      - name: Frontend — install and type check
+        run: |
+          npm ci
+          npx tsc --noEmit
+        working-directory: frontend
